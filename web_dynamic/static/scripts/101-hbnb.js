@@ -1,120 +1,179 @@
-$(document).ready(function () {
-  let myAmenities = [];
-  let myStates = [];
-  let myCities = [];
+document.addEventListener('DOMContentLoaded', function () {
+  let localhost = true;
+  let urlPrefix = 'http://0.0.0.0';
+  let $h4Amenities = $('div.amenities h4');
+  let $h4Locations = $('div.locations h4');
+  let amenitiesFilter = [];
+  let statesFilter = [];
+  let citiesFilter = [];
 
-  $('.amenities .popover input[type=checkbox]').click(function () {
-    const myListName = [];
-    myAmenities = [];
+  if (localhost) {
+    urlPrefix = 'http://localhost';
+  }
 
-    $('.amenities .popover  input[type=checkbox]:checked').each(function () {
-      myListName.unshift($(this).attr('data-name'));
-      myAmenities.unshift($(this).attr('data-id'));
-    });
-    if (myListName.length === 0) {
-      $('.amenities h4').html('&nbsp;');
-    } else {
-      $('.amenities h4').text(myListName.join(', '));
-    }
-    console.log(myAmenities);
-  });
+  // sort places in an alphabetical order
+  function compare (a, b) {
+    if (a.name.toLowerCase() < b.name.toLowerCase()) { return -1; }
+    if (a.name.toLowerCase() > b.name.toLowerCase()) { return 1; }
+    return 0;
+  }
 
-  $('.locations .popover h2 input[type=checkbox]').click(function () {
-    const myListName = [];
-    myStates = [];
-
-    $('.locations .popover h2 input[type=checkbox]:checked').each(function () {
-      myListName.unshift($(this).attr('data-name'));
-      myStates.unshift($(this).attr('data-id'));
-    });
-    if (myListName.length === 0) {
-      $('.locations h6.myStates').html('&nbsp;');
-    } else {
-      $('.locations h6.myStates').text(myListName.join(', '));
-    }
-    console.log(myStates);
-  });
-
-  $('.locations .popover ul ul input[type=checkbox]').click(function () {
-    const myListName = [];
-    myCities = [];
-
-    $('.locations .popover ul ul input[type=checkbox]:checked').each(function () {
-      myListName.unshift($(this).attr('data-name'));
-      myCities.unshift($(this).attr('data-id'));
-    });
-    if (myListName.length === 0) {
-      $('.locations h6.myCities').html('&nbsp;');
-    } else {
-      $('.locations h6.myCities').text(myListName.join(', '));
-    }
-    console.log(myCities);
-  });
-
-  $('.filters button').click(function (event) {
-    event.preventDefault();
-
-    $('.places').text('');
-
-    const obj = {};
-    obj.amenities = myAmenities;
-    obj.states = myStates;
-    obj.cities = myCities;
-
-    listPlaces(JSON.stringify(obj));
-  });
-
-  $.ajax({
-    url: 'http://0.0.0.0:5001/api/v1/status/',
-    type: 'GET',
-    dataType: 'json',
-    success: function (json) {
-      $('#api_status').addClass('available');
-    },
-
-    error: function (xhr, status) {
-      console.log('error ' + xhr);
-    }
-  });
-  listPlaces();
-});
-
-function listPlaces (consult = '{}') {
-  console.log(consult);
-  $.ajax({
-    type: 'POST',
-    url: 'http://0.0.0.0:5001/api/v1/places_search',
-    dataType: 'json',
-    data: consult,
-    contentType: 'application/json; charset=utf-8',
-    success: function (places) {
-      console.log(places);
-      for (let i = 0; i < places.length; i++) {
-        $('.places').append(`
-<article>
-<div class="title_box">
-<h2> ${places[i].name}</h2>
-<div class="price_by_night"> ${places[i].price_by_night} </div>
-</div>
-<div class="information">
-<div class="max_guest">${places[i].max_guest}
-${places[i].max_guest > 1 ? 'Guests' : 'Guest'} </div>
-<div class="number_rooms">${places[i].number_rooms}
-${places[i].number_rooms > 1 ? 'Bedrooms' : 'Bedroom'}  </div>
-<div class="number_bathrooms">${places[i].number_bathrooms}
-${places[i].number_bathrooms > 1 ? 'Bathrooms' : 'Bathroom'}  </div>
-</div>
-<div class="user">
-</div>
-<div class="description">
-${places[i].description}
-</div>
-</article>
-`);
+  // script to display places according to all filters
+  $('button').click(function () {
+    $.ajax({
+      type: 'POST',
+      contentType: 'application/json',
+      url: urlPrefix + ':5001/api/v1/places_search/',
+      data: JSON.stringify({'amenities': amenitiesFilter, 'states': statesFilter, 'cities': citiesFilter}),
+      success: function (data) {
+        emptyPlaces();
+        data.sort(compare);
+        populatePlaces(data);
       }
-    },
-    error: function (xhr, status) {
-      console.log('error ' + status);
-    }
+
+    });
   });
-}
+
+  // A checkbox for amenities
+  $('div.amenities input').each(function (idx, ele) {
+    let id = $(this).attr('data-id');
+    let name = $(this).attr('data-name');
+
+    // set change method for all checkboxes
+    $(ele).change(function () {
+      let delimiter = '<span class="delim">, </span>';
+      $('div.amenities h4 span.delim').remove();
+
+      if (this.checked) {
+        $h4Amenities.append('<span id=' + id + '>' + name + '</span>');
+        amenitiesFilter.push(id);
+      } else {
+        $('span#' + id).remove();
+        amenitiesFilter.splice(amenitiesFilter.indexOf(id), 1);
+      }
+
+      // add delimeter to page
+      let length = $('div.amenities h4 > span').length;
+      $('div.amenities h4 span').each(function (idx, ele) {
+        if (idx < length - 1) {
+          $(this).append(delimiter);
+        }
+      });
+    });
+  });
+
+  // location checkbox
+  $('div.locations input').each(function (idx, ele) {
+    let id = $(this).attr('data-id');
+    let name = $(this).attr('data-name');
+    let isClass = $(this).attr('data-class');
+
+    // set change method on checkboxes
+    $(ele).change(function () {
+      let delimiter = '<span class="delim">, </span>';
+      $('div.locations h4 span.delim').remove();
+
+      if (this.checked) {
+        $h4Locations.append('<span id=' + id + '>' + name + '</span>');
+        if (isClass === 'State') {
+          statesFilter.push(id);
+        } else {
+          citiesFilter.push(id);
+        }
+      } else {
+        $('span#' + id).remove();
+        if (isClass === 'State') {
+          statesFilter.splice(statesFilter.indexOf(id), 1);
+        } else {
+          citiesFilter.splice(citiesFilter.indexOf(id), 1);
+        }
+      }
+
+      // add delimeter
+      let length = $('div.locations h4 > span').length;
+      $('div.locations h4 span').each(function (idx, ele) {
+        if (idx < length - 1) {
+          $(this).append(delimiter);
+        }
+      });
+    });
+  });
+
+  // check status of HBNB website
+  $(function () {
+    $.ajax({
+      type: 'GET',
+      url: urlPrefix + ':5001/api/v1/status/',
+      success: function (data) {
+        let $apiStatus = $('DIV#api_status');
+        if (data.status === 'OK') {
+          $apiStatus.addClass('available');
+        } else {
+          $apiStatus.removeClass('available');
+        }
+      }
+    });
+
+    // call fx's to sort and display places
+    $.ajax({
+      type: 'POST',
+      contentType: 'application/json',
+      url: urlPrefix + ':5001/api/v1/places_search/',
+      data: JSON.stringify({}),
+      success: function (data) {
+        data.sort(compare);
+        populatePlaces(data);
+      }
+    });
+  });
+
+  // remove all tags under section.places
+  function emptyPlaces () {
+    $('SECTION.places').empty();
+  }
+
+  // display places and reviews
+  function populatePlaces (data) {
+    $.ajax({
+      type: 'GET',
+      url: urlPrefix + ':5001/api/v1/users/',
+      success: function (users) {
+        let userDict = {};
+        $(users).each(function (index, user) {
+          userDict[user.id] = user;
+        });
+
+        $(data).each(function (index, place) {
+          $('SECTION.places').append('<article><div class="title"><h2>' + place.name + '</h2><div class="price_by_night">$' + place.price_by_night + '</div></div><div class="information"><div class="max_guest"><i class="fa fa-users fa-3x" aria-hidden="true"></i><br />' + place.max_guest + 'Guests</div><div class="number_rooms"><i class="fa fa-bed fa-3x" aria-hidden="true"></i><br />' + place.number_rooms + 'Bedrooms</div><div class="number_bathrooms"><i class="fa fa-bath fa-3x" aria-hidden="true"></i><br />' + place.number_bathrooms + 'Bathroom</div></div><div class="user"><strong>Owner: </strong>' + userDict[place.user_id].first_name + ' ' + userDict[place.user_id].last_name + '</div><div class="description">' + place.description + '</div>' + '<br /><div class="reviews"><h2 class="reviews"><span class="reviewCount" id="' + place.id + '"> 0 </span>Reviews</h2><span id="' + place.id + '" class="toggle">show</span></div><span class="reviewContent" id="' + place.id + '"></span></article>');
+
+          let placeId = place.id;
+          $.ajax({
+            type: 'GET',
+            url: urlPrefix + ':5001/api/v1/places/' + placeId + '/reviews/',
+            success: function (reviews) {
+              let $contentSpan = $('span.reviewContent#' + placeId);
+              let $toggleSpan = $('span.toggle#' + placeId);
+              if ($contentSpan.attr('id')) {
+                $(reviews).each(function (idx, review) {
+                  $('span.reviewCount#' + placeId).text(reviews.length + ' ');
+                  $contentSpan.append('<p class="reviewText">' + review.text + '</p>');
+                  $contentSpan.hide();
+                });
+              }
+              $toggleSpan.click(function () {
+                if ($contentSpan) {
+                  $contentSpan.toggle('slow');
+                  if ($toggleSpan.text() === 'hide') {
+                    $toggleSpan.text('show');
+                  } else {
+                    $toggleSpan.text('hide');
+                  }
+                }
+              });
+            }
+          });
+        });
+      }
+    });
+  }
+});
